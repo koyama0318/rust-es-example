@@ -1,116 +1,101 @@
-// struct NoteStateEvent {
-//     state: NoteState,
-//     event: NoteEvent,
-// }
+mod model;
+mod store;
 
-// enum NoteState {
-//     Unvalidated(UnvalidatedNote),
-//     UnCompleted(UncompletedNote),
-//     Completed(CompletedNote),
-//     Archived(ArchivedNote),
-// }
-// impl NoteState {
-//     // TODO: From関数
-//     fn mutate(self, cmd: Command) -> Result<NoteStateEvent, ()> {
-//         match (self, cmd) {
-//             (NoteState::Unvalidated(note), Command::Validate) => validate(note)
-//                 .map(|note| NoteState::UnCompleted(note))
-//                 .and_then(|state| {
-//                     Ok(NoteStateEvent {
-//                         state: state,
-//                         event: NoteEvent::Validated,
-//                     })
-//                 }),
-//             _ => Err(()),
-//         }
-//     }
-// }
+use model::*;
+use store::*;
 
-// #[derive(PartialEq)]
-// enum NoteEvent {
-//     Validated,
-//     Completed,
-//     Archived,
-// }
+// MARK: - WorkFlow
+trait CreateNoteWorkflow: Fn(Command) -> Result<(), AppError> {}
+impl<T> CreateNoteWorkflow for T where T: Fn(Command) -> Result<(), AppError> {}
 
-// struct UnvalidatedNote {}
-// struct UncompletedNote {}
-// struct CompletedNote {}
-// struct ArchivedNote {}
+// TODO: receive eventStore closure
+fn create_note_workflow() -> impl CreateNoteWorkflow {
+    |command: Command| {
+        let save_note_fn =
+            |stateEvent: NoteStateEvent| -> Result<NoteState, DomainError> { Ok(stateEvent.state) };
 
-// // TODO: Domain, DomainEventを返す
-// fn validate(note: UnvalidatedNote) -> Result<UncompletedNote, ()> {
-//     Ok(UncompletedNote {})
-// }
-// fn complete(note: UncompletedNote) -> CompletedNote {
-//     CompletedNote {}
-// }
-// fn archive(note: CompletedNote) -> ArchivedNote {
-//     ArchivedNote {}
-// }
+        let replay_fn =
+            || -> Result<NoteState, DomainError> { Ok(NoteState::UnCompleted(UncompletedNote {})) };
 
-// fn apply_event(state: NoteState, event: &NoteEvent) -> Result<NoteState, ()> {
-//     match (state, event) {
-//         (NoteState::Unvalidated(note), NoteEvent::Validated) => {
-//             validate(note).and_then(|note| Ok(NoteState::UnCompleted(note)))
-//         }
-//         (_, _) => Err(()),
-//     }
-// }
+        // 1. replay aggregate from event store. If not found, create new aggregate.
+        // 2. create note and event
+        // 3. store event
+        return replay_fn()
+            .and_then(|state| mutate(state, create))
+            .and_then(&save_note_fn)
+            .map(|_| ())
+            .map_err(|_| AppError::DomainError);
+    }
+}
 
-// fn store_event(state: NoteStateEvent) -> Result<NoteState, ()> {
-//     Ok(state.state)
-// }
+// MARK: - Handler
+enum Command {
+    Create,
+    Complete,
+    Archive,
+}
 
-// enum Command {
-//     Validate,
-//     Complete,
-//     Archive,
-// }
+impl Command {
+    fn from(input: Input) -> Result<Self, AppError> {
+        match input.command.as_str() {
+            "create" => Ok(Command::Create),
+            "complete" => Ok(Command::Complete),
+            "archive" => Ok(Command::Archive),
+            _ => Err(AppError::InvalidCommand),
+        }
+    }
+}
 
-// struct Input {
-//     command: Command,
-//     args: Vec<String>,
-// }
+struct Input {
+    command: String,
+}
 
-// #[derive(Debug)]
-// struct Payload {
-//     message: String,
-// }
+#[derive(Debug)]
+struct Payload {
+    code: i16,
+}
 
-// fn get_events() -> Result<Vec<NoteEvent>, ()> {
-//     Ok(vec![NoteEvent::Validated])
-// }
+impl Payload {
+    fn from(result: Result<(), AppError>) -> Self {
+        let code = if result.is_ok() { 200 } else { 500 };
+        return Self { code };
+    }
+}
 
-// fn handle(input: Input) -> Result<Payload, ()> {
-//     let events = get_events().expect("");
-//     let default = NoteState::Unvalidated(UnvalidatedNote {});
-//     let state: NoteState = events.into_iter().fold(default, |state, event| {
-//         apply_event(state, &event).expect("msg")
-//     });
+fn handle(input: Input) -> String {
+    // Validate input and create command
+    match Command::from(input) {
+        Ok(command) => match command {
+            Command::Create => {
+                // make workflow
+                let workflow = create_note_workflow();
+                // call workflow
+                let result = workflow(command);
+                // make result to json string
+                return format!("{:?}", Payload::from(result));
+            }
+            Command::Complete => unimplemented!(),
+            Command::Archive => unimplemented!(),
+        },
+        Err(_) => String::from("Invalid command"),
+    }
+}
 
-//     match input.command {
-//         Command::Validate => state
-//             .mutate(input.command)
-//             .or_else(|_| {
-//                 println!("command error");
-//                 return Err(());
-//             })
-//             .and_then(store_event)
-//             .map(|_| Payload {
-//                 message: String::from("success"),
-//             }),
-//         _ => Ok(Payload {
-//             message: String::from("invalid command"),
-//         }),
-//     }
-// }
+enum AppError {
+    InvalidCommand,
+    DomainError,
+}
 
-// fn main() {
-//     let cmd = Input {
-//         command: Command::Validate,
-//         args: vec![],
-//     };
-//     let result = handle(cmd);
-//     println!("{:?}", result)
-// }
+// MARK: - Main
+
+fn main() {
+    println!("Hello, world!");
+
+    let input = Input {
+        command: String::from("create"),
+    };
+
+    let result = handle(input);
+
+    println!("Result: {:?}", result);
+}
