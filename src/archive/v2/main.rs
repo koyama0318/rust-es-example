@@ -79,7 +79,7 @@ fn handle(input: Input) -> String {
             Command::Complete => unimplemented!(),
             Command::Archive => unimplemented!(),
         },
-        Err(_) => String::from("Invalid command"),
+        Err(_) => "Invalid command".to_string(),
     }
 }
 
@@ -94,7 +94,7 @@ fn main() {
     println!("Hello, world!");
 
     let input = Input {
-        command: String::from("create"),
+        command: "create".to_string(),
     };
 
     let result = handle(input);
