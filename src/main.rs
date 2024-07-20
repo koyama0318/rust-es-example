@@ -15,6 +15,7 @@ use store::*;
 struct Input {
     command: String,
     create_note: UnvalidatedNote,
+    update_id: String,
 }
 
 fn handle(input: Input) {
@@ -23,16 +24,20 @@ fn handle(input: Input) {
             let command = CreateNoteCommand {
                 note: input.create_note,
             };
-            let store_fn = create_store_fn();
+            let store_fn = make_store_fn();
             let workflow = create_note_workflow(store_fn);
-            let result = workflow(command);
-
-            println!("{:?}", result)
+            let payload = workflow(command);
+            println!("{:?}", payload);
         }
         "complete" => {
-            let command = CompletedNoteCommand {
-                id: NoteId::default(),
+            let command = CompleteNoteCommand {
+                id: input.update_id,
             };
+            let store_fn = make_store_fn();
+            let aggregate_fn = make_aggregate_fn();
+            let workflow = complete_note_workflow(store_fn, aggregate_fn);
+            let payload = workflow(command);
+            println!("{:?}", payload);
         }
         _ => {}
     }
@@ -44,6 +49,7 @@ fn main() {
         create_note: UnvalidatedNote {
             content: "New note contents".to_string(),
         },
+        update_id: "".to_string(),
     };
     handle(input);
 }

@@ -20,10 +20,10 @@ impl NoteId {
         NoteId { id }
     }
 
-    pub fn new(id: String) -> Option<Self> {
+    pub fn new(id: String) -> Result<Self, AppError> {
         match Uuid::parse_str(&id) {
-            Ok(id) => Some(Self { id: id.to_string() }),
-            Err(_) => None,
+            Ok(id) => Ok(Self { id: id.to_string() }),
+            Err(_) => Err(AppError::InvalidCommand),
         }
     }
 }
@@ -65,6 +65,12 @@ pub struct CompletedNote {
     pub content: String,
 }
 
+impl Storable for CompletedNote {
+    fn store(&self) -> Result<(), AppError> {
+        Ok(())
+    }
+}
+
 pub fn validate(note: UnvalidatedNote) -> Result<ValidatedNote, AppError> {
     let note = ValidatedNote {
         id: NoteId::default(),
@@ -79,9 +85,8 @@ pub fn create(note: ValidatedNote) -> Result<(UncompletedNote, NoteEvent), AppEr
         content: note.content.clone(),
     };
     let event = NoteEvent::Created {
-        id: note.id.id(),
+        id: note.id,
         data: NoteCreatedEvent {
-            id: note.id.id(),
             content: note.content,
         },
     };
@@ -93,6 +98,6 @@ pub fn complete(note: UncompletedNote) -> Result<(CompletedNote, NoteEvent), App
         id: note.id.clone(),
         content: note.content,
     };
-    let event = NoteEvent::Completed { id: note.id.id() };
+    let event = NoteEvent::Completed { id: note.id };
     Ok((completed, event))
 }
