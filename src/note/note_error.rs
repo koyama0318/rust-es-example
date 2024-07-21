@@ -1,4 +1,4 @@
 #[derive(Debug)]
-pub enum AppError {
+pub enum NoteError {
     InvalidCommand,
 }

@@ -1,5 +1,5 @@
+use crate::event_store::*;
 use crate::note::*;
-use crate::StoreFn;
 
 pub struct CreateNoteCommand {
     pub note: UnvalidatedNote,
@@ -15,9 +15,8 @@ impl<T> CreateNoteWorkFlow for T where T: Fn(CreateNoteCommand) -> CreateNotePay
 
 pub fn create_note_workflow<F: StoreFn>(store_fn: F) -> impl CreateNoteWorkFlow {
     move |cmd: CreateNoteCommand| {
-        let result = validate(cmd.note)
-            .and_then(create)
-            .and_then(|(note, event)| store_fn(&note, &event).and_then(|_| Ok(note)));
+        let result = validate_and_create(cmd.note)
+            .and_then(|(note, event)| store_fn(&event).and_then(|_| Ok(note)));
 
         match result {
             Ok(note) => CreateNotePayload {

@@ -1,4 +1,4 @@
-use crate::{note::*, note_event::NoteEvent, AppError};
+use crate::{note::*, State};
 
 pub enum NoteState {
     Unvalidated(UnvalidatedNote),
@@ -6,12 +6,12 @@ pub enum NoteState {
     Completed(CompletedNote),
 }
 
-impl NoteState {
-    pub fn default() -> NoteState {
+impl State<NoteEvent, NoteError> for NoteState {
+    fn default() -> NoteState {
         NoteState::Unvalidated(UnvalidatedNote::default())
     }
 
-    pub fn apply(self, event: NoteEvent) -> Result<NoteState, AppError> {
+    fn apply(self, event: NoteEvent) -> Result<NoteState, NoteError> {
         match (self, event) {
             (NoteState::Unvalidated(note), NoteEvent::Created { id: _, data }) => {
                 Ok(note.set(data.content))
@@ -21,20 +21,20 @@ impl NoteState {
             (NoteState::Uncompleted(note), NoteEvent::Completed { .. }) => Ok(note)
                 .and_then(complete)
                 .and_then(|(note, _)| Ok(NoteState::Completed(note))),
-            _ => Err(AppError::InvalidCommand),
+            _ => Err(NoteError::InvalidCommand),
         }
     }
 }
 
-pub fn unwrap_to_uncompleted(state: NoteState) -> Result<UncompletedNote, AppError> {
+pub fn unwrap_to_uncompleted(state: NoteState) -> Result<UncompletedNote, NoteError> {
     match state {
         NoteState::Uncompleted(note) => Ok(note),
-        _ => Err(AppError::InvalidCommand),
+        _ => Err(NoteError::InvalidCommand),
     }
 }
 
 pub fn validate_and_create(
     note: UnvalidatedNote,
-) -> Result<(UncompletedNote, NoteEvent), AppError> {
+) -> Result<(UncompletedNote, NoteEvent), NoteError> {
     validate(note).and_then(create)
 }

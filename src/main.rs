@@ -1,16 +1,10 @@
-mod complete_note_workflow;
-mod create_note_workflow;
-mod error;
+mod event_store;
+mod event_store_impl;
 mod note;
-mod note_event;
-mod note_state;
-mod store;
 
-use complete_note_workflow::*;
-use create_note_workflow::*;
-use error::*;
-use note::*;
-use store::*;
+use crate::event_store::*;
+use crate::event_store_impl::*;
+use crate::note::*;
 
 struct Input {
     command: String,
@@ -34,8 +28,8 @@ fn handle(input: Input) {
                 id: input.update_id,
             };
             let store_fn = make_store_fn();
-            let aggregate_fn = make_aggregate_fn();
-            let workflow = complete_note_workflow(store_fn, aggregate_fn);
+            let get_note_fn = make_get_note_fn();
+            let workflow = complete_note_workflow(store_fn, get_note_fn);
             let payload = workflow(command);
             println!("{:?}", payload);
         }
